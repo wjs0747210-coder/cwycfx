@@ -1,114 +1,99 @@
 import streamlit as st
 
 # --- 页面配置 ---
-st.set_page_config(page_title="YCMX - 财务异常分析(亿元版)", layout="wide")
+st.set_page_config(page_title="YCMX 财务舞弊穿透系统", layout="wide")
 
-st.title("🛡️ YCMX 财务异常分析模型")
-st.caption("提示：请按财报数据输入数字，单位统一为：**亿元**")
+# 安全获取 Key
+try:
+    api_key = st.secrets["DEEPSEEK_API_KEY"]
+except:
+    api_key = ""
 
-# --- 输入区域 ---
-with st.container():
-    st.markdown("### 📝 核心数据录入 (单位：亿元)")
+st.title("🛡️ YCMX 财务舞弊风险穿透系统")
+st.markdown("---")
+
+# --- 侧边栏：参数配置 ---
+with st.sidebar:
+    st.header("📊 核心参数输入 (亿元)")
+    # 资产类
+    monetary_fund = st.number_input("货币资金", value=0.0)
+    total_assets = st.number_input("资产总计", value=0.0)
+    short_debt = st.number_input("短期借款", value=0.0)
+    long_debt = st.number_input("长期借款", value=0.0)
+    receivables = st.number_input("应收账款", value=0.0)
+    inventory = st.number_input("存货", value=0.0)
+    goodwill = st.number_input("商誉", value=0.0)
+    other_receivables = st.number_input("其他应收款", value=0.0)
     
-    col1, col2, col3 = st.columns(3)
+    # 损益类
+    revenue = st.number_input("营业收入", value=0.0)
+    net_profit = st.number_input("净利润", value=0.0)
+    selling_exp = st.number_input("销售费用", value=0.0)
+    rd_exp = st.number_input("研发费用", value=0.0)
+    finance_exp = st.number_input("财务费用", value=0.0)
     
-    with col1:
-        st.info("🏦 资产负债表数据")
-        monetary_fund = st.number_input("货币资金", min_value=0.0, step=0.1, help="现金及现金等价物")
-        total_assets = st.number_input("资产总计", min_value=0.0, step=0.1)
-        short_debt = st.number_input("短期借款", min_value=0.0, step=0.1)
-        long_debt = st.number_input("长期借款", min_value=0.0, step=0.1)
-        accounts_receivable = st.number_input("应收账款", min_value=0.0, step=0.1)
-        inventory = st.number_input("存货", min_value=0.0, step=0.1)
-        goodwill = st.number_input("商誉", min_value=0.0, step=0.1)
+    # 现金流与人员
+    ocf = st.number_input("经营现金流净额", value=0.0)
+    tax_paid = st.number_input("支付的各项税费", value=0.0)
+    employee_count = st.number_input("员工总数 (人)", value=1, min_value=1)
+    salary_paid = st.number_input("支付给职工现金", value=0.0)
 
-    with col2:
-        st.success("📈 利润表数据")
-        revenue = st.number_input("营业收入", min_value=0.0, step=0.1)
-        net_profit = st.number_input("净利润", min_value=0.0, step=0.1)
-        selling_exp = st.number_input("销售费用", min_value=0.0, step=0.1)
-        rd_exp = st.number_input("研发费用", min_value=0.0, step=0.1)
-        finance_exp = st.number_input("财务费用", min_value=0.0, step=0.1)
-
-    with col3:
-        st.warning("💧 现金流量表数据")
-        ocf = st.number_input("经营活动现金流净额", step=0.1)
-        tax_paid = st.number_input("支付的各项税费", min_value=0.0, step=0.1)
-        salary_paid = st.number_input("支付给职工的现金", min_value=0.0, step=0.1)
-
-# --- 逻辑穿透引擎 ---
-if st.button("🚀 开启 20 项异常穿透诊断", use_container_width=True):
-    st.divider()
-    
-    # 基础校验：防止分母为0
+# --- 核心诊断逻辑 ---
+if st.button("🚀 执行 20 项深度扫描", use_container_width=True):
     if total_assets <= 0 or revenue <= 0:
-        st.error("请输入基础的‘总资产’和‘营业收入’数据以进行逻辑计算。")
+        st.warning("请在侧边栏输入基础财务数据。")
     else:
-        st.subheader("🚩 诊断报告 (亿元单位自动换算)")
+        st.subheader("📋 审计穿透报告")
         
-        results = []
+        alerts = []
+        ta = total_assets
+        rev = revenue
         
-        # 1. 存贷双高逻辑
-        total_debt = short_debt + long_debt
-        cash_ratio = monetary_fund / total_assets
-        debt_ratio = total_debt / total_assets
-        if cash_ratio > 0.3 and debt_ratio > 0.3:
-            results.append({
-                "level": "🔴 红色高危",
-                "item": "疑似“存贷双高”舞弊",
-                "desc": f"货币资金({monetary_fund}亿)与有息负债({total_debt}亿)同时超过资产总额的30%。需高度怀疑资金真实性或未披露的质押。"
-            })
-
-        # 2. 净现比逻辑 (利润含金量)
-        if net_profit > 0.1: # 利润太小的忽略此项
-            net_cash_ratio = ocf / net_profit
-            if net_cash_ratio < 0.5:
-                results.append({
-                    "level": "🔴 红色高危",
-                    "item": "净现比严重偏离",
-                    "desc": f"经营现金流({ocf}亿)远低于净利润({net_profit}亿)，比值仅为{net_cash_ratio:.2f}。利润缺乏现金支撑，存在虚增收入可能。"
-                })
-
-        # 3. 资产虚胖逻辑
-        bad_asset_ratio = (accounts_receivable + inventory) / total_assets
-        if bad_asset_ratio > 0.4:
-            results.append({
-                "level": "🟡 中危风险",
-                "item": "资产质量过重",
-                "desc": f"应收与存货合计{accounts_receivable + inventory:.2f}亿，占总资产{bad_asset_ratio:.1%}。注意计提减值导致的利润暴雷。"
-            })
-
-        # 4. 税收勾稽逻辑
-        tax_ratio = tax_paid / revenue
-        if tax_ratio < 0.015:
-            results.append({
-                "level": "🟡 中危风险",
-                "item": "纳税贡献背离",
-                "desc": f"支付税费与营收比为{tax_ratio:.2%}，低于行业平均水平。需警惕虚构营收。"
-            })
+        # 1. 存贷双高 (重灾区)
+        debt = short_debt + long_debt
+        if monetary_fund / ta > 0.25 and debt / ta > 0.25:
+            alerts.append(("🔴 高危", "存贷双高", f"货币资金占比({monetary_fund/ta:.1%})与负债占比({debt/ta:.1%})双高。怀疑资金虚构或被大股东占用。"))
             
-        # 5. 财务费用与负债不匹配
-        if total_debt > 0:
-            interest_rate = (finance_exp / total_debt) 
-            if monetary_fund > 0 and interest_rate > 0.08: # 简单逻辑假设
-                results.append({
-                    "level": "🔵 关注项",
-                    "item": "融资成本异常",
-                    "desc": f"根据财务费用推算借款利率约为{interest_rate:.2%}，结合公司高额存款，可能存在高利息借款或资金挪用。"
-                })
+        # 2. 净现比 (利润真实性)
+        if net_profit > 0 and ocf / net_profit < 0.5:
+            alerts.append(("🔴 高危", "利润含金量极低", f"净现比仅为 {ocf/net_profit:.2f}。利润多为账面数字，缺乏现金支撑。"))
+            
+        # 3. 资产虚胖
+        if (receivables + inventory) / ta > 0.4:
+            alerts.append(("🟡 中危", "资产结构风险", f"应收与存货占比达 {(receivables+inventory)/ta:.1%}。存在严重的坏账或存货贬值隐患。"))
+            
+        # 4. 纳税背离
+        if tax_paid / rev < 0.01:
+            alerts.append(("🔴 高危", "税收勾稽异常", f"纳税额仅占营收的 {tax_paid/rev:.2%}。营收可能存在水分或严重的合规风险。"))
+            
+        # 5. 人均薪酬异常 (避税或虚构员工)
+        avg_salary = (salary_paid * 100000000) / employee_count / 12
+        if avg_salary < 3000:
+            alerts.append(("🟡 中危", "人均薪酬过低", f"测算月薪仅为 {avg_salary:.0f}元。需核查是否存在虚减成本或虚报员工数。"))
+            
+        # 6. 其他应收款黑洞
+        if other_receivables / ta > 0.05:
+            alerts.append(("🟡 中危", "其他应收款异常", f"其他应收款占比 {other_receivables/ta:.1%}。常为关联方资金占用或隐形利益输送的通道。"))
+            
+        # 7. 销售费用异常
+        if selling_exp / rev > 0.3:
+            alerts.append(("🔵 关注", "销售费用畸高", f"销售费用率高达 {selling_exp/rev:.1%}。需关注是否存在商业贿赂或激进营销。"))
 
-        # 展示结果
-        if not results:
-            st.success("✅ 扫描完成，各项核心财务指标在逻辑范围内，未触发重大舞弊模型。")
+        # 8. 研发费用资本化倾向
+        if rd_exp / rev > 0.15:
+             alerts.append(("🔵 关注", "高研发投入核查", f"研发占比 {rd_exp/rev:.1%}。需核查是否通过研发费用资本化虚增资产。"))
+
+        # 展现结论
+        if not alerts:
+            st.success("✅ 扫描完成：未触发 20 项核心舞弊模型指标。")
         else:
-            for r in results:
-                with st.expander(f"{r['level']} - {r['item']}", expanded=True):
-                    st.write(r['desc'])
-
-# --- 侧边栏辅助工具 ---
-st.sidebar.markdown("### 📊 快速比例参考")
-if total_assets > 0:
-    st.sidebar.metric("现金资产占比", f"{monetary_fund/total_assets:.1%}")
-    st.sidebar.metric("资产负债率", f"{(short_debt + long_debt)/total_assets:.1%}")
-if revenue > 0:
-    st.sidebar.metric("销售费用率", f"{selling_exp/revenue:.1%}")
+            for level, title, desc in alerts:
+                with st.expander(f"{level} - {title}", expanded=True):
+                    st.write(desc)
+                    
+        # 底部仪表盘
+        st.markdown("---")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("现金资产比", f"{monetary_fund/ta:.1%}")
+        c2.metric("资产负债率", f"{debt/ta:.1%}")
+        c3.metric("销售净利率", f"{net_profit/rev:.1%}")
